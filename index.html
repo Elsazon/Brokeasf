@@ -142,6 +142,15 @@
   .theme-swatch.selected{border-color:var(--ink);}
   .theme-swatch.selected::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;text-shadow:0 1px 2px rgba(0,0,0,.4);}
   .theme-name{font-size:11px;color:var(--ink-soft);text-align:center;margin-top:4px;}
+  .tabs{display:flex;gap:8px;margin:0 0 16px;}
+  .tab-btn{flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font-weight:700;font-size:14px;color:var(--ink-soft);cursor:pointer;font-family:inherit;}
+  .tab-btn.active{background:var(--green);color:#fff;border-color:var(--green);}
+  .next-label{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin:0 0 10px;}
+  .unp-item .name{color:var(--red);font-weight:600;}
+  .unp-item .amt{color:var(--red);}
+  .unp-del{background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px 6px;}
+  .unp-note{font-size:12.5px;color:var(--red);margin-top:6px;padding:8px 10px;background:var(--paper);border-radius:8px;}
+  .add-unp{font-size:13px;color:var(--ink-soft);background:none;border:1.5px dashed var(--line);border-radius:8px;padding:8px 12px;cursor:pointer;margin-top:10px;width:100%;font-family:inherit;}
   .migrate-banner{background:var(--gold-soft);border:1.5px solid var(--gold);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:14px;}
 
   footer{margin-top:30px;font-size:12.5px;color:var(--ink-soft);line-height:1.6;}
@@ -238,6 +247,12 @@
       <button class="btn-icon" id="btnSettings" aria-label="Editar configuración">⚙️</button>
     </header>
 
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="resumen">📊 Resumen</button>
+      <button class="tab-btn" data-tab="cheques">📆 Cheques</button>
+    </div>
+
+    <div id="tabResumen">
     <div class="card">
       <div class="summary-row">
         <span class="label">Pagado a deuda</span>
@@ -258,6 +273,8 @@
       <div class="target" id="focusTarget">—</div>
       <div class="why" id="focusWhy"></div>
     </div>
+
+    <div id="nextCheckHost"></div>
 
     <div class="card hidden" id="goalsCard">
       <h2>🎯 Metas de ahorro</h2>
@@ -290,8 +307,6 @@
       <div class="legend" id="chartLegend"></div>
     </div>
 
-    <div id="checks"></div>
-
     <div class="card">
       <h2>🧰 Herramientas</h2>
       <div class="btn-row">
@@ -301,6 +316,12 @@
         <input type="file" id="importFile" accept=".json" style="display:none">
       </div>
     </div>
+    </div><!-- /tabResumen -->
+
+    <div id="tabCheques" class="hidden">
+      <div id="checks"></div>
+    </div>
+
 
     <footer>
       <strong>Cómo funciona:</strong> Los montos en verde son pagos a deuda — editables: escribe lo que pagaste de verdad y todo se recalcula. El botón ❄️ registra pagos extra en cualquier momento. Marca una deuda en la lista de bajas cuando el balance real llegue a $0. Tus datos viven solo en este navegador — haz backup de vez en cuando. Esta herramienta es educativa, no asesoría financiera.
@@ -335,6 +356,13 @@ async function loadState(){
   try{ if(window.storage){ const r = await window.storage.get(STORE_KEY); raw = r ? r.value : null; } }catch(e){}
   if(!raw){ try{ raw = localStorage.getItem(STORE_KEY); }catch(e){} }
   if(raw){ try{ state = Object.assign(state, JSON.parse(raw)); }catch(e){} }
+  // compatibilidad hacia atrás: rellenar campos nuevos sin romper planes existentes
+  if(!state.unplanned) state.unplanned = {};
+  if(state.config){
+    if(!state.config.name) state.config.name = '';
+    if(!state.config.goals) state.config.goals = [];
+    state.config.goals.forEach(g=>{ if(!g.priority) g.priority = 'alta'; });
+  }
 }
 function getOldState(){
   try{ const raw = localStorage.getItem(OLD_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
@@ -412,13 +440,22 @@ function goalProgress(goalId){
   (state.snowflakes||[]).forEach(s=>{ if(s.goalId===goalId) sum += s.amount; });
   return sum;
 }
-function goalPerCheck(goal, checks){
+function goalPerCheck(goal, checks, debtFreeYm){
   const remaining = Math.max(0, goal.target - goalProgress(goal.id));
-  if(remaining <= 0) return {remaining:0, perCheck:0, eligible:[]};
+  if(remaining <= 0) return {remaining:0, perCheck:0, eligible:[], blocked:false};
   const todayIso = isoOf(TODAY);
-  const eligible = checks.filter(c=> c.iso >= todayIso && c.ym <= goal.deadline);
-  if(!eligible.length) return {remaining, perCheck:0, eligible:[]};
-  return {remaining, perCheck: Math.ceil(remaining/eligible.length), eligible};
+  let eligible = checks.filter(c=> c.iso >= todayIso && c.ym <= goal.deadline);
+  let blocked = false;
+  if(goal.priority === 'flexible' && state.config && state.config.debts.length){
+    if(debtFreeYm === null || debtFreeYm === undefined){
+      eligible = []; blocked = true; // la deuda nunca libera en la proyección
+    } else {
+      eligible = eligible.filter(c=> c.ym > Math.floor(debtFreeYm - 0.01));
+      if(!eligible.length) blocked = true;
+    }
+  }
+  if(!eligible.length) return {remaining, perCheck:0, eligible:[], blocked};
+  return {remaining, perCheck: Math.ceil(remaining/eligible.length), eligible, blocked};
 }
 function buildAvail(cfg, checks){
   const perCheckExp = cfg.expenses.filter(e=>e.freq==='porCheque').reduce((s,e)=>s+e.amount,0);
@@ -432,6 +469,7 @@ function buildAvail(cfg, checks){
   let goalBeyondWindow = 0;
   const windowEnd = checks.length ? checks[checks.length-1].ym : nowM;
   (cfg.goals||[]).forEach(g=>{
+    if(g.priority === 'flexible') return; // no reserva: la deuda va primero
     const info = goalPerCheck(g, checks);
     if(info.perCheck <= 0) return;
     info.eligible.forEach(c=>{ if(map[c.ym] !== undefined) map[c.ym] -= info.perCheck; });
@@ -622,7 +660,7 @@ function monthHasLogs(items, m){
 }
 
 /* ================= CONSTRUIR CHEQUES ================= */
-function buildCheckItems(cfg, checks, planMatrix, avail){
+function buildCheckItems(cfg, checks, planMatrix, avail, planFreeMonth){
   const byCheck = [];   // [{check, items:[{key,n,a,debt?}] , totalPlan}]
   const map = {};       // key -> item
   const byMonthDebt = {}; // m -> debtId -> [keys]
@@ -635,7 +673,7 @@ function buildCheckItems(cfg, checks, planMatrix, avail){
   // aportes de metas por cheque (iso -> [{goal, amt}])
   const goalByCheck = {};
   (cfg.goals||[]).forEach(g=>{
-    const info = goalPerCheck(g, checks);
+    const info = goalPerCheck(g, checks, planFreeMonth);
     if(info.perCheck <= 0) return;
     info.eligible.forEach(c=>{
       (goalByCheck[c.iso] = goalByCheck[c.iso]||[]).push({goal:g, amt:info.perCheck});
@@ -715,7 +753,7 @@ function computeAll(){
   const checks = genChecks(cfg);
   const avail = buildAvail(cfg, checks);
   const plan = simulate({mode:'plan', checks, avail});
-  const items = buildCheckItems(cfg, checks, plan.planMatrix, avail);
+  const items = buildCheckItems(cfg, checks, plan.planMatrix, avail, plan.freeMonth);
   const real = simulate({mode:'real', checks, avail, items});
   CACHE = {checks, avail, plan, items, real};
   return CACHE;
@@ -739,6 +777,7 @@ function renderApp(){
   document.getElementById('goalsCard').classList.toggle('hidden', !hasGoals);
   computeAll();
   renderChecks();
+  renderNextCheck();
   renderDebts();
   renderKills();
   updateDynamic();
@@ -761,15 +800,18 @@ function renderGoals(){
   el.innerHTML = '';
   goals.forEach(g=>{
     const saved = goalProgress(g.id);
-    const info = goalPerCheck(g, CACHE.checks);
+    const info = goalPerCheck(g, CACHE.checks, CACHE.plan.freeMonth);
     const pct = Math.min(100, Math.round(saved/g.target*100));
     let sub;
     if(saved >= g.target){
       sub = `🏆 ¡Meta completada!`;
+    } else if(info.blocked){
+      sub = `⏳ Prioridad "después de deudas" — con tu plan actual la deuda no libera antes de ${ymLabel(g.deadline)}. Mueve la fecha o cámbiala a prioridad alta en ⚙️.`;
     } else if(!info.eligible.length){
       sub = `⚠️ La fecha límite pasó — edítala en ⚙️ (faltan ${money(info.remaining)})`;
     } else {
-      sub = `Aparta <strong>${money(info.perCheck)}</strong> de cada cheque · llegas ~${ymLabel(g.deadline)}`;
+      const tag = g.priority==='flexible' ? ' · arranca al liberar la deuda' : '';
+      sub = `Aparta <strong>${money(info.perCheck)}</strong> de cada cheque${tag} · llegas ~${ymLabel(g.deadline)}`;
     }
     el.innerHTML += `<div style="padding:10px 0;border-bottom:1px solid var(--line)">
       <div class="summary-row"><span style="font-weight:700">${g.name}</span>
@@ -777,6 +819,81 @@ function renderGoals(){
       <div class="bar"><div class="bar-fill" style="width:${pct}%"></div></div>
       <div class="bar-note">${sub}</div>
     </div>`;
+  });
+}
+
+function checkCardHTML(bc){
+  const c = bc.check;
+  const net = state.config.income - state.config.autoSave;
+  let html = `<div class="check-head"><span class="check-date">${c.label}</span><span class="check-tag">Cheque</span></div>`;
+  html += `<div class="check-sub num">Disponible: ${money(net)}${state.config.autoSave?` (después de ${money(state.config.autoSave)} de ahorro automático)`:''}</div>`;
+  bc.items.forEach(it=>{
+    const v = state.done[it.key];
+    const on = v !== undefined && v !== false;
+    if(it.debt){
+      const val = typeof v === 'number' ? v : it.a;
+      html += `<div class="item debt ${on?'checked':''}" data-key="${it.key}">
+        <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
+        <span class="name">${it.n}</span>
+        <input type="number" inputmode="decimal" value="${val}" min="0" step="1" aria-label="Monto pagado: ${it.n}">
+      </div>`;
+    } else {
+      html += `<div class="item ${on?'checked':''}" data-key="${it.key}"${it.goal?` data-amt="${it.a}"`:''}>
+        <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
+        <span class="name">${it.n}</span>
+        <span class="amt num">${money(it.a)}</span>
+      </div>`;
+    }
+  });
+  const total = bc.items.reduce((s,i)=>s+i.a,0);
+  html += `<div class="check-total num"><span>Total plan</span><span>${money(total)}</span></div>`;
+  // gastos imprevistos de este cheque
+  const unp = (state.unplanned && state.unplanned[c.iso]) || [];
+  if(unp.length){
+    unp.forEach((u,ui)=>{
+      html += `<div class="item unp-item"><span class="name">⚡ ${u.n}</span>
+        <span class="amt num">−${money(u.a)}</span>
+        <button class="unp-del" data-iso="${c.iso}" data-idx="${ui}" aria-label="Quitar imprevisto">✕</button></div>`;
+    });
+    const unpTotal = unp.reduce((s,u)=>s+u.a,0);
+    html += `<div class="unp-note num">⚡ Imprevistos: ${money(unpTotal)} — te quedan ~${money(Math.max(0, net-total-unpTotal+0))} menos de sobrante. Si hace falta, ajusta los pagos verdes de este cheque.</div>`;
+  }
+  html += `<button class="add-unp" data-iso="${c.iso}">+ apuntar gasto imprevisto ⚡</button>`;
+  if(bc.note) html += `<div class="balance-note">${bc.note}</div>`;
+  return html;
+}
+
+function bindCheckCards(container){
+  container.querySelectorAll('.item[data-key]').forEach(row=>{
+    const key = row.dataset.key;
+    const cb = row.querySelector('input[type=checkbox]');
+    const numInput = row.querySelector('input[type=number]');
+    if(!cb) return;
+    cb.addEventListener('change', ()=>{
+      if(cb.checked){
+        state.done[key] = numInput ? (parseFloat(numInput.value)||0)
+          : (row.dataset.amt ? parseFloat(row.dataset.amt) : true);
+      }
+      else { delete state.done[key]; }
+      row.classList.toggle('checked', cb.checked);
+      updateDynamic(); saveState();
+    });
+    if(numInput){
+      numInput.addEventListener('change', ()=>{
+        if(cb.checked){ state.done[key] = parseFloat(numInput.value)||0; updateDynamic(); saveState(); }
+      });
+    }
+  });
+  container.querySelectorAll('.add-unp').forEach(btn=>{
+    btn.addEventListener('click', ()=>openUnplannedModal(btn.dataset.iso));
+  });
+  container.querySelectorAll('.unp-del').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const iso = btn.dataset.iso, idx = parseInt(btn.dataset.idx,10);
+      state.unplanned[iso].splice(idx,1);
+      if(!state.unplanned[iso].length) delete state.unplanned[iso];
+      saveState(); renderChecks(); renderNextCheck();
+    });
   });
 }
 
@@ -795,53 +912,58 @@ function renderChecks(){
     }
     const card = document.createElement('div');
     card.className = 'check';
-    const net = state.config.income - state.config.autoSave;
-    let html = `<div class="check-head"><span class="check-date">${c.label}</span><span class="check-tag">Cheque</span></div>`;
-    html += `<div class="check-sub num">Disponible: ${money(net)}${state.config.autoSave?` (después de ${money(state.config.autoSave)} de ahorro automático)`:''}</div>`;
-    bc.items.forEach(it=>{
-      const v = state.done[it.key];
-      const on = v !== undefined && v !== false;
-      if(it.debt){
-        const val = typeof v === 'number' ? v : it.a;
-        html += `<div class="item debt ${on?'checked':''}" data-key="${it.key}">
-          <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
-          <span class="name">${it.n}</span>
-          <input type="number" inputmode="decimal" value="${val}" min="0" step="1" aria-label="Monto pagado: ${it.n}">
-        </div>`;
-      } else {
-        html += `<div class="item ${on?'checked':''}" data-key="${it.key}"${it.goal?` data-amt="${it.a}"`:''}>
-          <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
-          <span class="name">${it.n}</span>
-          <span class="amt num">${money(it.a)}</span>
-        </div>`;
-      }
-    });
-    const total = bc.items.reduce((s,i)=>s+i.a,0);
-    html += `<div class="check-total num"><span>Total plan</span><span>${money(total)}</span></div>`;
-    card.innerHTML = html;
+    card.innerHTML = checkCardHTML(bc);
     container.appendChild(card);
   });
+  bindCheckCards(container);
+}
 
-  container.querySelectorAll('.item').forEach(row=>{
-    const key = row.dataset.key;
-    const cb = row.querySelector('input[type=checkbox]');
-    const numInput = row.querySelector('input[type=number]');
-    cb.addEventListener('change', ()=>{
-      if(cb.checked){
-        state.done[key] = numInput ? (parseFloat(numInput.value)||0)
-          : (row.dataset.amt ? parseFloat(row.dataset.amt) : true);
-      }
-      else { delete state.done[key]; }
-      row.classList.toggle('checked', cb.checked);
-      updateDynamic(); saveState();
-    });
-    if(numInput){
-      numInput.addEventListener('change', ()=>{
-        if(cb.checked){ state.done[key] = parseFloat(numInput.value)||0; updateDynamic(); saveState(); }
-      });
-    }
+function renderNextCheck(){
+  const host = document.getElementById('nextCheckHost');
+  const todayIso = isoOf(TODAY);
+  let bc = CACHE.items.byCheck.find(b=>b.check.iso >= todayIso);
+  if(!bc) bc = CACHE.items.byCheck[CACHE.items.byCheck.length-1];
+  if(!bc){ host.innerHTML=''; return; }
+  host.innerHTML = `<div class="next-label">💵 Tu próximo cheque</div>
+    <div class="check extra">${checkCardHTML(bc)}</div>
+    <div class="btn-row" style="margin-bottom:16px"><button class="btn btn-outline" id="goCheques" style="width:100%">Ver todos los cheques 📆</button></div>`;
+  bindCheckCards(host);
+  document.getElementById('goCheques').addEventListener('click', ()=>setTab('cheques'));
+}
+
+function openUnplannedModal(iso){
+  openModal(`
+    <h3>⚡ Gasto imprevisto</h3>
+    <div class="hint" style="margin-bottom:10px">Apunta a dónde se fue el dinero esta quincena — así sabes por qué no cuadra y reajustas con calma, sin culpa.</div>
+    <div class="field"><label>¿Qué fue?</label><input id="unpName" placeholder="Gomas del carro, receta, regalo…"></div>
+    <div class="field"><label>Monto ($)</label><input type="number" id="unpAmt" inputmode="decimal" placeholder="80" min="1"></div>
+    <div class="btn-row">
+      <button class="btn btn-green" id="unpSave">Apuntar</button>
+      <button class="btn btn-outline" id="unpCancel">Cancelar</button>
+    </div>
+  `);
+  document.getElementById('unpCancel').addEventListener('click', closeModal);
+  document.getElementById('unpSave').addEventListener('click', ()=>{
+    const n = document.getElementById('unpName').value.trim();
+    const a = parseFloat(document.getElementById('unpAmt').value);
+    if(!n || !a || a<=0) return;
+    if(!state.unplanned) state.unplanned = {};
+    (state.unplanned[iso] = state.unplanned[iso]||[]).push({n, a});
+    saveState(); closeModal();
+    renderChecks(); renderNextCheck();
   });
 }
+
+/* Tabs */
+function setTab(t){
+  document.getElementById('tabResumen').classList.toggle('hidden', t!=='resumen');
+  document.getElementById('tabCheques').classList.toggle('hidden', t!=='cheques');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.tab===t));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.tab-btn').forEach(b=>{
+  b.addEventListener('click', ()=>setTab(b.dataset.tab));
+});
 
 function renderDebts(){
   const el = document.getElementById('debtList');
@@ -1232,7 +1354,12 @@ function addGoalRow(g){
     <div class="field-row">
       <div class="field"><label>Meta ($)</label><input class="gTarget" type="number" inputmode="decimal" value="${g.target||''}" placeholder="3000"></div>
       <div class="field"><label>¿Para cuándo?</label><input class="gDeadline" type="month" value="${ymToMonthInput(g.deadline!==undefined&&g.deadline!==null?g.deadline:null)}"></div>
-    </div>`;
+    </div>
+    <div class="field"><label>Prioridad</label>
+      <select class="gPrio">
+        <option value="alta" ${g.priority!=='flexible'?'selected':''}>Apartar primero (antes de las deudas)</option>
+        <option value="flexible" ${g.priority==='flexible'?'selected':''}>Cuando la deuda lo permita (después)</option>
+      </select></div>`;
   div.querySelector('.row-del').addEventListener('click', ()=>div.remove());
   document.getElementById('wGoals').appendChild(div);
 }
@@ -1278,7 +1405,8 @@ document.getElementById('wSave').addEventListener('click', ()=>{
     const dl = r.querySelector('.gDeadline').value;
     if(gname && target > 0){
       goals.push({id:'g'+i+'-'+gname.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,12),
-        name:gname, target, deadline: dl ? parseMonthInput(dl) : (ymOf(TODAY)+12)});
+        name:gname, target, deadline: dl ? parseMonthInput(dl) : (ymOf(TODAY)+12),
+        priority: r.querySelector('.gPrio').value});
     }
   });
 
