@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operación Deuda Cero</title>
+<style>
+  :root{
+    --paper:#F2F4EF; --card:#FFFFFF; --ink:#17241D; --ink-soft:#5A6A60;
+    --green:#1F6B4A; --green-soft:#E4EFE8; --gold:#C99A2E; --gold-soft:#F7EFDC;
+    --red:#B3543F; --blue:#4A6B8A; --line:#DDE3DC; --radius:14px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--paper); color:var(--ink); padding:20px 16px 90px;
+    font-size:16px; line-height:1.45;
+  }
+  .wrap{max-width:680px;margin:0 auto;}
+  .num{font-variant-numeric:tabular-nums;}
+  header{margin-bottom:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .eyebrow{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--green);margin-bottom:6px;}
+  h1{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.15;}
+  h2{font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+  h3{font-size:18px;font-weight:800;margin-bottom:12px;}
+  .card{background:var(--card);border-radius:var(--radius);padding:18px;margin-bottom:16px;box-shadow:0 1px 3px rgba(23,36,29,.08);}
+
+  .summary-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .summary-row .label{font-size:13px;color:var(--ink-soft);font-weight:600;}
+  .summary-row .val{font-size:22px;font-weight:800;}
+  .summary-row .val.small{font-size:16px;color:var(--ink-soft);}
+  .bar{height:10px;background:var(--green-soft);border-radius:6px;overflow:hidden;margin:10px 0 6px;}
+  .bar-fill{height:100%;background:var(--green);border-radius:6px;width:0%;transition:width .4s ease;}
+  .bar-note{font-size:12px;color:var(--ink-soft);}
+  .free-date{margin-top:10px;padding:10px 12px;background:var(--green-soft);border-radius:10px;font-size:14px;}
+  .free-date strong{color:var(--green);}
+  .warn-box{margin-top:10px;padding:10px 12px;background:#F7E5DC;border-radius:10px;font-size:13.5px;color:var(--red);}
+
+  .debt-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .debt-row:last-child{border-bottom:none;}
+  .debt-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+  .debt-info{flex:1;min-width:0;}
+  .debt-name{font-weight:700;font-size:15px;}
+  .debt-meta{font-size:12px;color:var(--ink-soft);}
+  .debt-bal{font-weight:800;font-size:16px;text-align:right;}
+  .debt-payoff{font-size:11.5px;color:var(--ink-soft);text-align:right;}
+  .debt-row.dead .debt-name{text-decoration:line-through;color:var(--ink-soft);}
+  .debt-row.dead .debt-bal{color:var(--green);}
+
+  .kill-item{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .kill-item:last-child{border-bottom:none;}
+  .kill-item input{width:22px;height:22px;accent-color:var(--green);flex-shrink:0;}
+  .kill-name{font-weight:700;flex:1;font-size:15px;}
+  .kill-meta{font-size:12.5px;color:var(--ink-soft);}
+  .kill-item.done .kill-name{text-decoration:line-through;color:var(--ink-soft);}
+  .kill-item.done .kill-meta{color:var(--green);font-weight:600;}
+
+  .focus{background:var(--gold-soft);border:1.5px solid var(--gold);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;}
+  .focus .label{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:2px;}
+  .focus .target{font-size:18px;font-weight:800;}
+  .focus .why{font-size:13px;color:var(--ink-soft);margin-top:2px;}
+
+  .whatif-val{font-size:20px;font-weight:800;color:var(--green);}
+  input[type=range]{width:100%;accent-color:var(--green);margin:10px 0;}
+  .whatif-result{font-size:14px;background:var(--paper);border-radius:10px;padding:10px 12px;margin-top:8px;line-height:1.5;}
+  .whatif-result strong{color:var(--green);}
+
+  #chart{width:100%;height:230px;display:block;}
+  .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:12px;color:var(--ink-soft);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .legend i{width:10px;height:10px;border-radius:50%;display:inline-block;}
+
+  .month-label{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);margin:26px 0 10px;}
+  .check{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(23,36,29,.08);}
+  .check.extra{border:1.5px solid var(--gold);}
+  .check-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+  .check-date{font-weight:800;font-size:17px;text-transform:capitalize;}
+  .check-tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:20px;background:var(--green-soft);color:var(--green);}
+  .check.extra .check-tag{background:var(--gold-soft);color:var(--gold);}
+  .check-sub{font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
+  .item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);}
+  .item:last-of-type{border-bottom:none;}
+  .item input[type=checkbox]{width:22px;height:22px;accent-color:var(--green);flex-shrink:0;}
+  .item .name{flex:1;font-size:14.5px;}
+  .item .amt{font-weight:700;font-size:15px;}
+  .item.debt .name{font-weight:700;color:var(--green);}
+  .item.debt input[type=number]{
+    width:78px;padding:6px 8px;border:1.5px solid var(--line);border-radius:8px;
+    font-size:15px;font-weight:700;color:var(--green);text-align:right;
+    font-variant-numeric:tabular-nums;background:var(--card);
+  }
+  .item.debt input[type=number]:focus{outline:2px solid var(--green);border-color:var(--green);}
+  .item.checked .name,.item.checked .amt{text-decoration:line-through;color:var(--ink-soft);}
+  .check-total{display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1.5px solid var(--ink);font-weight:800;font-size:15px;}
+
+  .btn{display:inline-block;border:none;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .btn-green{background:var(--green);color:#fff;}
+  .btn-outline{background:var(--card);color:var(--green);border:1.5px solid var(--green);}
+  .btn-ghost{background:none;color:var(--ink-soft);border:none;text-decoration:underline;font-size:13px;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px;}
+  .btn:focus-visible{outline:3px solid var(--gold);}
+  .btn-icon{background:var(--card);border:1.5px solid var(--line);border-radius:10px;width:42px;height:42px;font-size:18px;cursor:pointer;flex-shrink:0;}
+
+  .fab{
+    position:fixed;bottom:20px;right:20px;width:58px;height:58px;border-radius:50%;
+    background:var(--green);color:#fff;font-size:26px;border:none;cursor:pointer;
+    box-shadow:0 4px 12px rgba(23,36,29,.3);z-index:50;
+  }
+  .fab:active{transform:scale(.94);}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(23,36,29,.45);display:none;align-items:flex-end;justify-content:center;z-index:100;overflow-y:auto;}
+  .modal-bg.open{display:flex;}
+  .modal{background:var(--card);border-radius:18px 18px 0 0;padding:22px 18px 30px;width:100%;max-width:680px;margin-top:auto;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin-bottom:4px;}
+  .field input,.field select{
+    width:100%;padding:10px;border:1.5px solid var(--line);border-radius:10px;
+    font-size:16px;font-family:inherit;background:var(--card);color:var(--ink);
+  }
+  .field input:focus,.field select:focus{outline:2px solid var(--green);border-color:var(--green);}
+  .field-row{display:flex;gap:10px;}
+  .field-row .field{flex:1;}
+  .modal-msg{font-size:14px;background:var(--green-soft);border-radius:10px;padding:10px 12px;margin-top:10px;display:none;}
+  .modal-msg.show{display:block;}
+
+  /* Wizard */
+  .wizard-step{margin-bottom:26px;}
+  .step-num{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--green);color:#fff;
+    align-items:center;justify-content:center;font-size:14px;font-weight:800;margin-right:8px;}
+  .row-item{background:var(--paper);border-radius:10px;padding:12px;margin-bottom:10px;position:relative;}
+  .row-del{position:absolute;top:8px;right:8px;background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px;}
+  .adv-toggle{font-size:13px;color:var(--blue);background:none;border:none;text-decoration:underline;cursor:pointer;padding:4px 0;}
+  .adv-fields{display:none;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);}
+  .adv-fields.open{display:block;}
+  .hint{font-size:12.5px;color:var(--ink-soft);margin-top:4px;line-height:1.4;}
+  .strategy-opt{display:flex;gap:10px;align-items:flex-start;padding:12px;background:var(--paper);border-radius:10px;margin-bottom:10px;cursor:pointer;border:2px solid transparent;}
+  .strategy-opt.selected{border-color:var(--green);background:var(--green-soft);}
+  .strategy-opt input{width:20px;height:20px;accent-color:var(--green);margin-top:2px;}
+  .strategy-opt .desc{font-size:13px;color:var(--ink-soft);}
+  .theme-row{display:flex;gap:14px;flex-wrap:wrap;}
+  .theme-swatch{width:48px;height:48px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0;position:relative;}
+  .theme-swatch.selected{border-color:var(--ink);}
+  .theme-swatch.selected::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:18px;text-shadow:0 1px 2px rgba(0,0,0,.4);}
+  .theme-name{font-size:11px;color:var(--ink-soft);text-align:center;margin-top:4px;}
+  .migrate-banner{background:var(--gold-soft);border:1.5px solid var(--gold);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:14px;}
+
+  footer{margin-top:30px;font-size:12.5px;color:var(--ink-soft);line-height:1.6;}
+  .save-status{position:fixed;bottom:22px;left:16px;font-size:12px;background:var(--ink);color:#fff;padding:6px 12px;border-radius:20px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:60;}
+  .save-status.show{opacity:.85;}
+  #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:200;}
+  .hidden{display:none !important;}
+  @media (prefers-reduced-motion: reduce){ .bar-fill{transition:none;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ============ WIZARD ============ -->
+  <div id="setupView" class="hidden">
+    <header><div>
+      <div class="eyebrow">Configura tu plan</div>
+      <h1>Operación Deuda Cero</h1>
+    </div></header>
+    <div id="migrateBanner"></div>
+    <div class="card wizard-step">
+      <h2><span class="step-num">1</span>Tus ingresos</h2>
+      <div class="field-row">
+        <div class="field"><label>¿Cuánto cobras por cheque? ($)</label>
+          <input type="number" id="wIncome" inputmode="decimal" placeholder="900"></div>
+        <div class="field"><label>¿Cada cuánto?</label>
+          <select id="wFreq">
+            <option value="quincenal">Cada 2 semanas</option>
+            <option value="semanal">Semanal</option>
+            <option value="mensual">Mensual</option>
+          </select></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Próximo día de cobro</label>
+          <input type="date" id="wNextPay"></div>
+        <div class="field"><label>Ahorro automático por cheque ($)</label>
+          <input type="number" id="wAutoSave" inputmode="decimal" placeholder="0" value="0"></div>
+      </div>
+      <div class="hint">El ahorro se aparta primero — el plan trabaja con lo que queda.</div>
+    </div>
+
+    <div class="card wizard-step">
+      <h2><span class="step-num">2</span>Tus gastos</h2>
+      <div class="hint" style="margin-bottom:10px">Renta, celular, comida, gasolina, colchón personal… Los <strong>mensuales</strong> se pagan una vez al mes; los <strong>por cheque</strong> (como comida) se descuentan de cada cobro.</div>
+      <div id="wExpenses"></div>
+      <button class="btn btn-outline" id="wAddExpense">+ Añadir gasto</button>
+    </div>
+
+    <div class="card wizard-step">
+      <h2><span class="step-num">3</span>Tus deudas</h2>
+      <div class="hint" style="margin-bottom:10px">El APR está en tu estado de cuenta. Si no sabes el mínimo, pon ~3% del balance. Usa "opciones avanzadas" para promos 0% o cargos recurrentes (suscripciones que cobran a esa tarjeta).</div>
+      <div id="wDebts"></div>
+      <button class="btn btn-outline" id="wAddDebt">+ Añadir deuda</button>
+    </div>
+
+    <div class="card wizard-step">
+      <h2><span class="step-num">4</span>Tu estrategia</h2>
+      <label class="strategy-opt" id="optAva">
+        <input type="radio" name="wStrategy" value="avalancha" checked>
+        <span><strong>Avalancha</strong> 🏔️<br><span class="desc">Ataca primero la deuda con el interés más alto. Matemáticamente ahorra más dinero.</span></span>
+      </label>
+      <label class="strategy-opt" id="optBola">
+        <input type="radio" name="wStrategy" value="bolaDeNieve">
+        <span><strong>Bola de nieve</strong> ⛄<br><span class="desc">Ataca primero la deuda más pequeña. Victorias rápidas que motivan a seguir.</span></span>
+      </label>
+    </div>
+
+    <div class="card wizard-step">
+      <h2><span class="step-num">5</span>El look de tu app</h2>
+      <div class="hint" style="margin-bottom:12px">Elige tu paleta — se aplica al instante y la puedes cambiar cuando quieras en ⚙️.</div>
+      <div class="theme-row" id="wThemes"></div>
+    </div>
+
+    <button class="btn btn-green" id="wSave" style="width:100%;padding:15px;font-size:16px;">Generar mi plan 🚀</button>
+    <div class="warn-box hidden" id="wError"></div>
+  </div>
+
+  <!-- ============ APP ============ -->
+  <div id="appView" class="hidden">
+    <header>
+      <div>
+        <div class="eyebrow">Plan de pagos · <span id="hFreq"></span></div>
+        <h1>Operación Deuda Cero</h1>
+      </div>
+      <button class="btn-icon" id="btnSettings" aria-label="Editar configuración">⚙️</button>
+    </header>
+
+    <div class="card">
+      <div class="summary-row">
+        <span class="label">Pagado a deuda</span>
+        <span class="val num" id="paidTotal">$0</span>
+      </div>
+      <div class="summary-row">
+        <span class="label">Meta (deuda + intereses proyectados)</span>
+        <span class="val small num" id="goalTotal">—</span>
+      </div>
+      <div class="bar"><div class="bar-fill" id="barFill"></div></div>
+      <div class="bar-note" id="barNote"></div>
+      <div class="free-date" id="freeDate"></div>
+      <div id="budgetWarn"></div>
+    </div>
+
+    <div class="focus">
+      <div class="label">¿Dinero extra? Tíralo a:</div>
+      <div class="target" id="focusTarget">—</div>
+      <div class="why" id="focusWhy"></div>
+    </div>
+
+    <div class="card">
+      <h2>💳 Tus deudas hoy</h2>
+      <div id="debtList"></div>
+    </div>
+
+    <div class="card">
+      <h2>☠️ Lista de bajas</h2>
+      <div id="killList"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔮 ¿Y si pago más al mes?</h2>
+      <div class="summary-row">
+        <span class="label">Extra mensual</span>
+        <span class="whatif-val num" id="whatifVal">$0</span>
+      </div>
+      <input type="range" id="whatifSlider" min="0" max="500" step="25" value="0" aria-label="Pago extra mensual">
+      <div class="whatif-result" id="whatifResult"></div>
+    </div>
+
+    <div class="card">
+      <h2>📉 Balances en el tiempo</h2>
+      <canvas id="chart"></canvas>
+      <div class="legend" id="chartLegend"></div>
+    </div>
+
+    <div id="checks"></div>
+
+    <div class="card">
+      <h2>🧰 Herramientas</h2>
+      <div class="btn-row">
+        <button class="btn btn-outline" id="btnIcs">📅 Recordatorios (.ics)</button>
+        <button class="btn btn-outline" id="btnExport">⬇️ Backup JSON</button>
+        <button class="btn btn-outline" id="btnImport">⬆️ Restaurar backup</button>
+        <input type="file" id="importFile" accept=".json" style="display:none">
+      </div>
+    </div>
+
+    <footer>
+      <strong>Cómo funciona:</strong> Los montos en verde son pagos a deuda — editables: escribe lo que pagaste de verdad y todo se recalcula. El botón ❄️ registra pagos extra en cualquier momento. Marca una deuda en la lista de bajas cuando el balance real llegue a $0. Tus datos viven solo en este navegador — haz backup de vez en cuando. Esta herramienta es educativa, no asesoría financiera.
+    </footer>
+  </div>
+</div>
+
+<button class="fab hidden" id="fabSnowflake" aria-label="Registrar pago extra">❄️</button>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modalContent"></div></div>
+<div class="save-status" id="saveStatus">Guardado ✓</div>
+<canvas id="confetti-canvas"></canvas>
+
+<script>
+"use strict";
+/* ================= ESTADO Y STORAGE ================= */
+const STORE_KEY = 'deuda-cero-v3';
+const OLD_KEY = 'deuda-cero-v2';
+const HORIZON = 72;          // meses máx de simulación
+const WINDOW_MONTHS = 12;    // meses de cheques visibles
+const TODAY = new Date();
+const PALETTE = ['#1F6B4A','#C99A2E','#B3543F','#4A6B8A','#7A5C8E','#3E7C7B','#8E6B4A','#5B5F97'];
+
+let state = { config:null, done:{}, kills:{}, snowflakes:[], whatif:0, prePaid:0 };
+
+async function saveState(){
+  const data = JSON.stringify(state);
+  try{ if(window.storage){ await window.storage.set(STORE_KEY, data); flashSave(); return; } }catch(e){}
+  try{ localStorage.setItem(STORE_KEY, data); flashSave(); }catch(e){}
+}
+async function loadState(){
+  let raw = null;
+  try{ if(window.storage){ const r = await window.storage.get(STORE_KEY); raw = r ? r.value : null; } }catch(e){}
+  if(!raw){ try{ raw = localStorage.getItem(STORE_KEY); }catch(e){} }
+  if(raw){ try{ state = Object.assign(state, JSON.parse(raw)); }catch(e){} }
+}
+function getOldState(){
+  try{ const raw = localStorage.getItem(OLD_KEY); return raw ? JSON.parse(raw) : null; }catch(e){ return null; }
+}
+let saveTimer;
+function flashSave(){
+  const el = document.getElementById('saveStatus');
+  el.classList.add('show');
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(()=>el.classList.remove('show'), 1200);
+}
+
+/* ================= UTILIDADES ================= */
+function ymOf(d){ return d.getFullYear()*12 + d.getMonth(); }
+function ymLabel(v){
+  const meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return meses[((v%12)+12)%12] + " " + Math.floor(v/12);
+}
+function payoffLabel(v){ return ymLabel(Math.floor(v - 0.01)); }
+function money(n){ return '$' + Math.round(n).toLocaleString('en-US'); }
+function isoOf(d){ return d.toISOString().slice(0,10); }
+function checkLabel(d){
+  return d.toLocaleDateString('es',{weekday:'short', day:'numeric', month:'short'}).replace(/\./g,'');
+}
+function monthName(m){
+  const meses = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  return meses[((m%12)+12)%12] + ' ' + Math.floor(m/12);
+}
+function parseMonthInput(v){ // "2027-01" -> ym
+  if(!v) return null;
+  const p = v.split('-');
+  return parseInt(p[0],10)*12 + (parseInt(p[1],10)-1);
+}
+function ymToMonthInput(v){
+  if(v===null || v===undefined) return '';
+  const y = Math.floor(v/12), m = (v%12)+1;
+  return y + '-' + String(m).padStart(2,'0');
+}
+
+/* ================= SCHEDULER ================= */
+function genChecks(cfg){
+  const out = [];
+  const start = new Date(cfg.nextPayDate + 'T12:00:00');
+  const endYm = ymOf(TODAY) + WINDOW_MONTHS;
+  if(cfg.freq === 'mensual'){
+    const dom = Math.min(start.getDate(), 28);
+    let d = new Date(start);
+    while(ymOf(d) <= endYm){
+      out.push(mkCheck(new Date(d)));
+      d = new Date(d.getFullYear(), d.getMonth()+1, dom, 12);
+    }
+  } else {
+    const step = cfg.freq === 'semanal' ? 7 : 14;
+    let d = new Date(start);
+    // el primer cheque es exactamente la fecha que entró el usuario;
+    // si quedó en el pasado (usuario recurrente), se generan hacia adelante desde ahí
+    while(ymOf(d) <= endYm){
+      out.push(mkCheck(new Date(d)));
+      d = new Date(d.getTime() + step*86400000);
+    }
+  }
+  return out;
+  function mkCheck(d){ return { date:d, iso:isoOf(d), ym:ymOf(d), label:checkLabel(d) }; }
+}
+
+/* disponible por mes: ingresos netos de los cheques del mes − gastos mensuales */
+function buildAvail(cfg, checks){
+  const perCheckExp = cfg.expenses.filter(e=>e.freq==='porCheque').reduce((s,e)=>s+e.amount,0);
+  const monthlyExp = cfg.expenses.filter(e=>e.freq==='mensual').reduce((s,e)=>s+e.amount,0);
+  const perCheckNet = cfg.income - cfg.autoSave - perCheckExp;
+  const map = {};
+  checks.forEach(c=>{ map[c.ym] = (map[c.ym]||0) + perCheckNet; });
+  Object.keys(map).forEach(k=>{ map[k] = map[k] - monthlyExp; });
+  const cpm = cfg.freq==='semanal' ? 52/12 : cfg.freq==='quincenal' ? 26/12 : 1;
+  const avg = perCheckNet*cpm - monthlyExp;
+  return { map, avg, perCheckNet, monthlyExp, perCheckExp };
+}
+
+/* ================= MOTOR ================= */
+function strategyOrder(debts, m, strategy){
+  const alive = debts.filter(d=>d.bal>0 && m >= d.startYm);
+  if(strategy === 'bolaDeNieve'){
+    return alive.sort((a,b)=>a.bal-b.bal);
+  }
+  return alive.sort((a,b)=>{
+    const aApr = (a.promoEnd!==null && a.promoEnd!==undefined && m < a.promoEnd) ? a.apr : (a.aprAfterPromo||a.apr);
+    const bApr = (b.promoEnd!==null && b.promoEnd!==undefined && m < b.promoEnd) ? b.apr : (b.aprAfterPromo||b.apr);
+    return bApr - aApr;
+  });
+}
+function payStrategy(debts, pool, m, strategy){
+  const order = strategyOrder(debts, m, strategy);
+  for(const d of order){
+    if(pool <= 0.01) break;
+    const p = Math.min(pool, d.bal);
+    d.bal -= p; pool -= p; d.paidThisMonth = (d.paidThisMonth||0) + p;
+    if(recordTarget) recordTarget(m, d.id, p);
+  }
+  return pool;
+}
+let recordTarget = null;
+
+/* simulate:
+   mode 'plan'  -> asigna disponible (mins + estrategia), graba planMatrix
+   mode 'real'  -> usa items resueltos (checked→real, no→plan) + snowflakes; fuera de ventana usa genérico */
+function simulate(opts){
+  const cfg = state.config;
+  const checks = opts.checks || genChecks(cfg);
+  const avail = opts.avail || buildAvail(cfg, checks);
+  const startYm = Math.min(ymOf(TODAY), checks.length ? checks[0].ym : ymOf(TODAY));
+  const extra = opts.extra || 0;
+  const nowM = ymOf(TODAY);
+
+  const debts = cfg.debts.map((d,i)=>({
+    id:d.id, name:d.name, bal:d.bal, apr:d.apr,
+    aprAfterPromo:d.aprAfterPromo||null, promoEnd:(d.promoEnd===undefined?null:d.promoEnd),
+    min:d.min, recurring:d.recurring||0,
+    color:d.color || PALETTE[i%PALETTE.length],
+    startYm: d.startYm!==undefined && d.startYm!==null ? d.startYm : startYm,
+    payoff:null, series:[], paidThisMonth:0, balBeforePay:0
+  }));
+
+  const planMatrix = {}; // planMatrix[m] = [{debtId, amt}]
+  recordTarget = opts.mode==='plan'
+    ? (m,id,p)=>{ if(!planMatrix[m]) planMatrix[m]=[]; planMatrix[m].push({debtId:id, amt:p}); }
+    : null;
+
+  // snowflakes por mes
+  const sfByMonth = {};
+  if(opts.mode==='real'){
+    (state.snowflakes||[]).forEach(s=>{
+      const m = ymOf(new Date(s.date+'T12:00:00'));
+      if(!sfByMonth[m]) sfByMonth[m]=[];
+      sfByMonth[m].push(s);
+    });
+  }
+
+  const windowEnd = checks.length ? checks[checks.length-1].ym : startYm;
+  let totalInterest = 0;
+  let insufficient = false;
+  const labels = [startYm];
+  debts.forEach(d=>d.series.push({m:startYm, bal: d.startYm<=startYm ? d.bal : 0}));
+
+  for(let m = startYm; m < startYm + HORIZON; m++){
+    debts.forEach(d=>{ d.paidThisMonth = 0; });
+    // 1. intereses y cargos (sin acumulación el mes de arranque de cada deuda)
+    debts.forEach(d=>{
+      if(m <= d.startYm || d.bal <= 0) return;
+      let apr = d.apr;
+      if(d.promoEnd!==null && m >= d.promoEnd && d.aprAfterPromo) apr = d.aprAfterPromo;
+      const interest = d.bal * apr/1200;
+      d.bal += interest; totalInterest += interest;
+      if(d.recurring) d.bal += d.recurring;
+    });
+
+    // 2. pagos
+    debts.forEach(d=>{ d.balBeforePay = d.bal; });
+    const monthAvail = (avail.map[m] !== undefined) ? avail.map[m] : avail.avg;
+
+    if(opts.mode==='plan' || m > windowEnd){
+      let pool = Math.max(0, monthAvail) + (m > nowM ? extra : 0);
+      // mínimos primero
+      debts.forEach(d=>{
+        if(d.bal <= 0 || m < d.startYm) return;
+        const p = Math.min(d.min, d.bal);
+        d.bal -= p; pool -= p; d.paidThisMonth += p;
+        if(recordTarget) recordTarget(m, d.id, p);
+      });
+      if(pool < -0.01) insufficient = true;
+      if(pool > 0) payStrategy(debts, pool, m, cfg.strategy);
+    } else {
+      // real dentro de la ventana
+      const logged = monthHasLogs(opts.items, m);
+      if(logged || m <= nowM){
+        // meses pasados o con registros: usar items resueltos + cascada
+        let overflow = 0;
+        debts.forEach(d=>{
+          const p = resolveMonthPayment(opts.items, m, d.id);
+          if(p <= 0) return;
+          if(d.bal <= 0){ overflow += p; return; }
+          const eff = Math.min(p, d.bal);
+          d.bal -= eff; d.paidThisMonth += eff;
+          overflow += p - eff;
+        });
+        (sfByMonth[m]||[]).forEach(s=>{
+          const d = debts.find(x=>x.id===s.debtId);
+          if(d && d.bal > 0){
+            const eff = Math.min(s.amount, d.bal);
+            d.bal -= eff; d.paidThisMonth += eff;
+            overflow += s.amount - eff;
+          } else { overflow += s.amount; }
+        });
+        if(overflow > 0) payStrategy(debts, overflow, m, cfg.strategy);
+        if(extra && m > nowM) payStrategy(debts, extra, m, cfg.strategy);
+      } else {
+        // meses futuros sin registros: asignación dinámica (auto-corregible)
+        let pool = Math.max(0, monthAvail) + extra;
+        (sfByMonth[m]||[]).forEach(s=>{ pool += s.amount; });
+        debts.forEach(d=>{
+          if(d.bal <= 0 || m < d.startYm) return;
+          const p = Math.min(d.min, d.bal);
+          d.bal -= p; pool -= p; d.paidThisMonth += p;
+        });
+        if(pool < -0.01) insufficient = true;
+        if(pool > 0) payStrategy(debts, pool, m, cfg.strategy);
+      }
+    }
+
+    // 3. payoff y series
+    debts.forEach(d=>{
+      if(d.bal <= 5 && d.payoff === null && m >= d.startYm && d.startYm <= m){
+        const frac = d.paidThisMonth > 0
+          ? Math.min(1, Math.max(0.05, d.balBeforePay / d.paidThisMonth))
+          : 0.5;
+        d.payoff = m + frac;
+        d.bal = 0; d.recurring = 0;
+      }
+      d.series.push({m:m+1, bal: m+1 >= d.startYm ? Math.max(0,d.bal) : 0});
+    });
+    labels.push(m+1);
+
+    const anyAlive = debts.some(d=> d.bal>0 || d.startYm>m );
+    if(!anyAlive) break;
+  }
+  recordTarget = null;
+
+  const allDead = debts.every(d=>d.payoff!==null);
+  const freeMonth = allDead ? Math.max.apply(null, debts.map(d=>d.payoff)) : null;
+  return { debts, totalInterest, freeMonth, planMatrix, insufficient, startYm };
+}
+
+function resolveMonthPayment(items, m, debtId){
+  let sum = 0;
+  (items.byMonthDebt[m] && items.byMonthDebt[m][debtId] || []).forEach(key=>{
+    const it = items.map[key];
+    const v = state.done[key];
+    if(v !== undefined && v !== false){ sum += (typeof v==='number' ? v : it.a); }
+    else sum += it.a;
+  });
+  return sum;
+}
+function monthHasLogs(items, m){
+  const md = items.byMonthDebt[m];
+  if(!md) return false;
+  for(const debtId in md){
+    for(const key of md[debtId]){
+      const v = state.done[key];
+      if(v !== undefined && v !== false) return true;
+    }
+  }
+  return false;
+}
+
+/* ================= CONSTRUIR CHEQUES ================= */
+function buildCheckItems(cfg, checks, planMatrix, avail){
+  const byCheck = [];   // [{check, items:[{key,n,a,debt?}] , totalPlan}]
+  const map = {};       // key -> item
+  const byMonthDebt = {}; // m -> debtId -> [keys]
+  const monthGroups = {};
+  checks.forEach(c=>{ (monthGroups[c.ym] = monthGroups[c.ym]||[]).push(c); });
+
+  const monthlyExpenses = cfg.expenses.filter(e=>e.freq==='mensual');
+  const perCheckExpenses = cfg.expenses.filter(e=>e.freq==='porCheque');
+  const debtName = {}; cfg.debts.forEach(d=>debtName[d.id]=d.name);
+
+  Object.keys(monthGroups).map(Number).sort((a,b)=>a-b).forEach(m=>{
+    const group = monthGroups[m];
+    // capacidad por cheque
+    const caps = group.map(()=> cfg.income - cfg.autoSave - perCheckExpenses.reduce((s,e)=>s+e.amount,0));
+    // asignar gastos mensuales al cheque con más capacidad
+    const assigned = group.map(()=>[]);
+    monthlyExpenses.slice().sort((a,b)=>b.amount-a.amount).forEach(e=>{
+      let best = 0;
+      caps.forEach((c,i)=>{ if(c > caps[best]) best = i; });
+      assigned[best].push(e);
+      caps[best] -= e.amount;
+    });
+    // pagos de deuda del mes, en orden, llenando cheques secuencialmente por capacidad
+    const debtPays = (planMatrix[m]||[]).map(p=>({debtId:p.debtId, amt:p.amt}));
+    const debtPerCheck = group.map(()=>[]);
+    let ci = 0;
+    debtPays.forEach(p=>{
+      let remaining = p.amt;
+      while(remaining > 0.5 && ci < group.length){
+        const room = Math.max(0, caps[ci]);
+        if(room < 1){ ci++; continue; }
+        const chunk = Math.min(room, remaining);
+        debtPerCheck[ci].push({debtId:p.debtId, amt:Math.round(chunk)});
+        caps[ci] -= chunk; remaining -= chunk;
+        if(caps[ci] < 1) ci++;
+      }
+      if(remaining > 0.5){ // sin capacidad: al último cheque
+        debtPerCheck[group.length-1].push({debtId:p.debtId, amt:Math.round(remaining)});
+      }
+    });
+
+    group.forEach((c, gi)=>{
+      const items = [];
+      perCheckExpenses.forEach((e,ei)=>{
+        items.push({key:`e|${c.iso}|pc${ei}`, n:e.name, a:e.amount});
+      });
+      assigned[gi].forEach((e)=>{
+        items.push({key:`e|${c.iso}|m-${e.name}`, n:e.name, a:e.amount});
+      });
+      // consolidar pagos por deuda dentro del cheque
+      const cons = {};
+      debtPerCheck[gi].forEach(p=>{ cons[p.debtId] = (cons[p.debtId]||0) + p.amt; });
+      Object.keys(cons).forEach((debtId, di)=>{
+        if(cons[debtId] < 1) return;
+        const key = `d|${c.iso}|${debtId}`;
+        const it = {key, n:(debtName[debtId]||debtId) + ' — pago', a:cons[debtId], debt:debtId};
+        items.push(it); map[key] = it;
+        if(!byMonthDebt[m]) byMonthDebt[m] = {};
+        if(!byMonthDebt[m][debtId]) byMonthDebt[m][debtId] = [];
+        byMonthDebt[m][debtId].push(key);
+      });
+      items.forEach(it=>{ if(!it.debt) map[it.key] = it; });
+      byCheck.push({check:c, items, isExtraCheck: group.length > (cfg.freq==='semanal'?4:cfg.freq==='quincenal'?2:1)});
+    });
+  });
+  return { byCheck, map, byMonthDebt };
+}
+
+/* ================= RENDER APP ================= */
+let CACHE = null; // {checks, avail, plan, items, real}
+
+function computeAll(){
+  const cfg = state.config;
+  const checks = genChecks(cfg);
+  const avail = buildAvail(cfg, checks);
+  const plan = simulate({mode:'plan', checks, avail});
+  const items = buildCheckItems(cfg, checks, plan.planMatrix, avail);
+  const real = simulate({mode:'real', checks, avail, items});
+  CACHE = {checks, avail, plan, items, real};
+  return CACHE;
+}
+
+function renderApp(){
+  applyTheme(state.config.theme || 'bosque');
+  document.getElementById('setupView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('fabSnowflake').classList.remove('hidden');
+  const f = state.config.freq;
+  document.getElementById('hFreq').textContent = f==='semanal'?'semanal':f==='quincenal'?'quincenal':'mensual';
+  computeAll();
+  renderChecks();
+  renderDebts();
+  renderKills();
+  updateDynamic();
+}
+
+function updateDynamic(){
+  computeAll();
+  updateSummary();
+  updateFocus();
+  updateWhatif();
+  drawChart();
+  updateDebtBalances();
+}
+
+function renderChecks(){
+  const container = document.getElementById('checks');
+  container.innerHTML = '';
+  let lastMonth = -1;
+  CACHE.items.byCheck.forEach(bc=>{
+    const c = bc.check;
+    if(c.ym !== lastMonth){
+      const m = document.createElement('div');
+      m.className = 'month-label';
+      m.textContent = monthName(c.ym);
+      container.appendChild(m);
+      lastMonth = c.ym;
+    }
+    const card = document.createElement('div');
+    card.className = 'check';
+    const net = state.config.income - state.config.autoSave;
+    let html = `<div class="check-head"><span class="check-date">${c.label}</span><span class="check-tag">Cheque</span></div>`;
+    html += `<div class="check-sub num">Disponible: ${money(net)}${state.config.autoSave?` (después de ${money(state.config.autoSave)} de ahorro automático)`:''}</div>`;
+    bc.items.forEach(it=>{
+      const v = state.done[it.key];
+      const on = v !== undefined && v !== false;
+      if(it.debt){
+        const val = typeof v === 'number' ? v : it.a;
+        html += `<div class="item debt ${on?'checked':''}" data-key="${it.key}">
+          <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
+          <span class="name">${it.n}</span>
+          <input type="number" inputmode="decimal" value="${val}" min="0" step="1" aria-label="Monto pagado: ${it.n}">
+        </div>`;
+      } else {
+        html += `<div class="item ${on?'checked':''}" data-key="${it.key}">
+          <input type="checkbox" ${on?'checked':''} aria-label="${it.n}">
+          <span class="name">${it.n}</span>
+          <span class="amt num">${money(it.a)}</span>
+        </div>`;
+      }
+    });
+    const total = bc.items.reduce((s,i)=>s+i.a,0);
+    html += `<div class="check-total num"><span>Total plan</span><span>${money(total)}</span></div>`;
+    card.innerHTML = html;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('.item').forEach(row=>{
+    const key = row.dataset.key;
+    const cb = row.querySelector('input[type=checkbox]');
+    const numInput = row.querySelector('input[type=number]');
+    cb.addEventListener('change', ()=>{
+      if(cb.checked){ state.done[key] = numInput ? (parseFloat(numInput.value)||0) : true; }
+      else { delete state.done[key]; }
+      row.classList.toggle('checked', cb.checked);
+      updateDynamic(); saveState();
+    });
+    if(numInput){
+      numInput.addEventListener('change', ()=>{
+        if(cb.checked){ state.done[key] = parseFloat(numInput.value)||0; updateDynamic(); saveState(); }
+      });
+    }
+  });
+}
+
+function renderDebts(){
+  const el = document.getElementById('debtList');
+  el.innerHTML = '';
+  state.config.debts.forEach((d,i)=>{
+    const dead = !!state.kills[d.id];
+    const color = d.color || PALETTE[i%PALETTE.length];
+    el.innerHTML += `<div class="debt-row ${dead?'dead':''}">
+      <span class="debt-dot" style="background:${color}"></span>
+      <div class="debt-info">
+        <div class="debt-name">${d.name}</div>
+        <div class="debt-meta num">${d.apr}% APR · mín ${money(d.min)}${d.recurring?` · +${money(d.recurring)}/mes recurrente`:''}${(d.promoEnd!==null&&d.promoEnd!==undefined)?` · promo hasta ${ymLabel(d.promoEnd-1)}`:''}</div>
+      </div>
+      <div>
+        <div class="debt-bal num" id="bal-${d.id}">—</div>
+        <div class="debt-payoff num" id="payoff-${d.id}"></div>
+      </div>
+    </div>`;
+  });
+}
+
+function updateDebtBalances(){
+  const nowM = Math.max(ymOf(TODAY), CACHE.real.startYm);
+  CACHE.real.debts.forEach(d=>{
+    const pt = d.series.find(s=>s.m===nowM);
+    const balEl = document.getElementById('bal-'+d.id);
+    const poEl = document.getElementById('payoff-'+d.id);
+    if(balEl) balEl.textContent = state.kills[d.id] ? '$0 ☠️' : '~'+money(pt?pt.bal:d.bal);
+    if(poEl){
+      poEl.textContent = (!state.kills[d.id] && d.payoff!==null) ? 'muere ~'+payoffLabel(d.payoff) : '';
+    }
+  });
+}
+
+function renderKills(){
+  const el = document.getElementById('killList');
+  el.innerHTML = '';
+  state.config.debts.forEach(d=>{
+    const on = !!state.kills[d.id];
+    const proj = CACHE.real.debts.find(x=>x.id===d.id);
+    const meta = on ? '☠️ eliminada' : (proj && proj.payoff!==null ? 'meta: '+payoffLabel(proj.payoff) : '');
+    el.innerHTML += `<div class="kill-item ${on?'done':''}" data-kill="${d.id}">
+      <input type="checkbox" ${on?'checked':''} aria-label="Deuda eliminada: ${d.name}">
+      <span class="kill-name">${d.name}</span>
+      <span class="kill-meta">${meta}</span>
+    </div>`;
+  });
+  el.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const id = e.target.closest('.kill-item').dataset.kill;
+      state.kills[id] = e.target.checked;
+      if(e.target.checked) fireConfetti();
+      renderKills(); renderDebts(); updateDynamic(); saveState();
+    });
+  });
+}
+
+function updateSummary(){
+  const real = CACHE.real;
+  let paid = state.prePaid || 0;
+  Object.keys(state.done).forEach(key=>{
+    const it = CACHE.items.map[key];
+    if(it && it.debt){
+      const v = state.done[key];
+      paid += (typeof v === 'number' ? v : it.a);
+    }
+  });
+  (state.snowflakes||[]).forEach(s=>paid += s.amount);
+
+  const totalDebt = state.config.debts.reduce((s,d)=>s+d.bal,0);
+  const goal = (state.prePaid||0) + totalDebt + real.totalInterest;
+  document.getElementById('paidTotal').textContent = money(paid);
+  document.getElementById('goalTotal').textContent = money(goal);
+  const pct = goal > 0 ? Math.min(100, Math.round(paid/goal*100)) : 0;
+  document.getElementById('barFill').style.width = pct + '%';
+  const note = document.getElementById('barNote');
+  if(pct >= 100) note.textContent = '🏁 ¡DEUDA CERO! Lo lograste.';
+  else if(pct >= 75) note.textContent = pct + '% — la recta final.';
+  else if(pct >= 50) note.textContent = pct + '% — pasaste la mitad. El impulso es tuyo.';
+  else if(pct >= 25) note.textContent = pct + '% — los intereses ya muerden menos.';
+  else note.textContent = pct + '% pagado — cada pago cuenta. 💪';
+
+  const fd = document.getElementById('freeDate');
+  if(real.freeMonth !== null){
+    fd.innerHTML = `Libre de deuda: <strong>~${payoffLabel(real.freeMonth)}</strong> · intereses totales proyectados: <strong>${money(real.totalInterest)}</strong>`;
+  } else {
+    fd.innerHTML = '⚠️ Con el presupuesto actual, la proyección no llega a deuda cero en 6 años — revisa gastos o mínimos en ⚙️.';
+  }
+  const bw = document.getElementById('budgetWarn');
+  let warnHtml = '';
+  if(real.insufficient){
+    warnHtml += `<div class="warn-box">⚠️ Hay meses donde tu disponible no cubre los pagos mínimos. Revisa tus gastos en ⚙️.</div>`;
+  }
+  state.config.debts.forEach(d=>{
+    if(d.promoEnd===null || d.promoEnd===undefined) return;
+    const proj = real.debts.find(x=>x.id===d.id);
+    if(proj && proj.payoff!==null && proj.payoff >= d.promoEnd + 1 && !state.kills[d.id]){
+      warnHtml += `<div class="warn-box">⚠️ ${d.name}: al ritmo actual no queda salda antes de que expire su promo (${ymLabel(d.promoEnd-1)}) — considera priorizarla.</div>`;
+    }
+  });
+  bw.innerHTML = warnHtml;
+}
+
+function updateFocus(){
+  const nowM = ymOf(TODAY);
+  const cfg = state.config;
+  const aliveCfg = cfg.debts.filter(d=>!state.kills[d.id]);
+  const t = document.getElementById('focusTarget');
+  const w = document.getElementById('focusWhy');
+  if(!aliveCfg.length){
+    t.textContent = '→ Cuenta de ahorros 🏆';
+    w.textContent = 'Deuda cero. Ahora todo extra construye tu colchón.';
+    return;
+  }
+  const fake = aliveCfg.map(d=>({...d, bal:d.bal, startYm:nowM}));
+  const target = strategyOrder(fake, nowM, cfg.strategy)[0];
+  t.textContent = '→ ' + target.name;
+  if(cfg.strategy==='bolaDeNieve'){
+    w.textContent = 'Tu deuda más pequeña — muere rápido y libera su mínimo. Usa el botón ❄️ para pagos extra.';
+  } else {
+    w.textContent = target.apr > 0
+      ? `Tu deuda más cara ahora mismo (${target.apr}%). Usa el botón ❄️ para registrar pagos extra.`
+      : 'Al 0% — pero pendiente a la fecha de su promo.';
+  }
+}
+
+function updateWhatif(){
+  const extra = state.whatif||0;
+  document.getElementById('whatifVal').textContent = money(extra) + '/mes';
+  document.getElementById('whatifSlider').value = extra;
+  const el = document.getElementById('whatifResult');
+  const base = CACHE.real;
+  if(!extra){
+    el.innerHTML = base.freeMonth !== null
+      ? `Plan actual: libre de deuda <strong>~${payoffLabel(base.freeMonth)}</strong>. Mueve el slider para ver qué pasa con más.`
+      : 'Mueve el slider para simular pagos extra.';
+    return;
+  }
+  const sim = simulate({mode:'real', checks:CACHE.checks, avail:CACHE.avail, items:CACHE.items, extra});
+  if(sim.freeMonth !== null && base.freeMonth !== null){
+    const daysSaved = Math.max(0, Math.round((base.freeMonth - sim.freeMonth) * 30.4));
+    const intSaved = Math.max(0, base.totalInterest - sim.totalInterest);
+    el.innerHTML = `Con <strong>${money(extra)}/mes extra</strong>: libre de deuda <strong>~${payoffLabel(sim.freeMonth)}</strong> — te adelantas <strong>~${daysSaved} días</strong> y te ahorras <strong>${money(intSaved)}</strong> en intereses.`;
+  } else if(sim.freeMonth !== null){
+    el.innerHTML = `Con <strong>${money(extra)}/mes extra</strong>: libre de deuda <strong>~${payoffLabel(sim.freeMonth)}</strong>.`;
+  } else {
+    el.textContent = 'Aún no alcanza — prueba con más o revisa tu configuración.';
+  }
+}
+
+/* ================= GRÁFICA ================= */
+function drawChart(){
+  const proj = CACHE.real;
+  const canvas = document.getElementById('chart');
+  if(!canvas.clientWidth) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth, H = 230;
+  canvas.width = W*dpr; canvas.height = H*dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const startM = proj.startYm;
+  const nowM = ymOf(TODAY);
+  const endM = proj.freeMonth !== null ? Math.ceil(proj.freeMonth)+1 : startM+18;
+  const maxBal = Math.max(100, ...proj.debts.map(d=>Math.max(...d.series.map(s=>s.bal))));
+  const padL=44, padR=8, padT=10, padB=24;
+  const x = m => padL + (m-startM)/Math.max(1,(endM-startM)) * (W-padL-padR);
+  const y = b => padT + (1 - b/maxBal) * (H-padT-padB);
+
+  const gridCol = themeVar('--line','#DDE3DC'), textCol = themeVar('--ink-soft','#5A6A60'), todayCol = themeVar('--gold','#C99A2E');
+  ctx.strokeStyle = gridCol; ctx.fillStyle = textCol;
+  ctx.font = '10px -apple-system, sans-serif'; ctx.lineWidth = 1;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const val = maxBal*f;
+    ctx.beginPath(); ctx.moveTo(padL, y(val)); ctx.lineTo(W-padR, y(val)); ctx.stroke();
+    const lbl = val >= 1000 ? '$'+(Math.round(val/100)/10)+'k' : '$'+Math.round(val);
+    ctx.fillText(lbl, 2, y(val)+3);
+  });
+  const stepX = Math.max(1, Math.round((endM-startM)/6));
+  for(let m=startM; m<=endM; m+=stepX){
+    ctx.fillText(ymLabel(m).split(' ')[0], x(m)-8, H-8);
+  }
+  if(nowM >= startM && nowM <= endM){
+    ctx.strokeStyle = todayCol; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(x(nowM), padT); ctx.lineTo(x(nowM), H-padB); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  proj.debts.forEach(d=>{
+    ctx.strokeStyle = d.color; ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    let started = false;
+    d.series.forEach(pt=>{
+      if(pt.m < startM || pt.m > endM) return;
+      if(!started){ ctx.moveTo(x(pt.m), y(pt.bal)); started = true; }
+      else ctx.lineTo(x(pt.m), y(pt.bal));
+    });
+    ctx.stroke();
+  });
+  document.getElementById('chartLegend').innerHTML =
+    proj.debts.map(d=>`<span><i style="background:${d.color}"></i>${d.name}</span>`).join('') +
+    `<span><i style="background:${themeVar('--gold','#C99A2E')};border-radius:0;width:2px;height:12px;"></i>hoy</span>`;
+}
+
+/* ================= TEMAS ================= */
+const THEMES = {
+  bosque:    {name:'Bosque',    paper:'#F2F4EF', card:'#FFFFFF', ink:'#17241D', inkSoft:'#5A6A60', line:'#DDE3DC', accent:'#1F6B4A', accentSoft:'#E4EFE8', gold:'#C99A2E', goldSoft:'#F7EFDC'},
+  oceano:    {name:'Océano',    paper:'#EFF3F6', card:'#FFFFFF', ink:'#16222D', inkSoft:'#596A78', line:'#D9E1E8', accent:'#2A5D8F', accentSoft:'#E2ECF5', gold:'#C99A2E', goldSoft:'#F7EFDC'},
+  uva:       {name:'Uva',       paper:'#F4F1F7', card:'#FFFFFF', ink:'#241D2C', inkSoft:'#6A5F76', line:'#E1DAE8', accent:'#6B4A8E', accentSoft:'#ECE5F4', gold:'#C08A3E', goldSoft:'#F7EEDC'},
+  terracota: {name:'Terracota', paper:'#F6F1EC', card:'#FFFFFF', ink:'#2B1E17', inkSoft:'#75655A', line:'#E6DCD2', accent:'#9C4A2F', accentSoft:'#F3E4DC', gold:'#8E7B2E', goldSoft:'#F1EDD8'},
+  noche:     {name:'Noche',     paper:'#171D1A', card:'#212925', ink:'#E8EDE9', inkSoft:'#9AA79F', line:'#33403A', accent:'#4FA97C', accentSoft:'#23372C', gold:'#D6AC4F', goldSoft:'#332C1B'}
+};
+let wizardTheme = 'bosque';
+function applyTheme(id){
+  const t = THEMES[id] || THEMES.bosque;
+  const r = document.documentElement.style;
+  r.setProperty('--paper', t.paper); r.setProperty('--card', t.card);
+  r.setProperty('--ink', t.ink); r.setProperty('--ink-soft', t.inkSoft);
+  r.setProperty('--line', t.line);
+  r.setProperty('--green', t.accent); r.setProperty('--green-soft', t.accentSoft);
+  r.setProperty('--gold', t.gold); r.setProperty('--gold-soft', t.goldSoft);
+}
+function themeVar(name, fallback){
+  try{
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  }catch(e){ return fallback; }
+}
+function renderThemeSwatches(selected){
+  wizardTheme = selected || 'bosque';
+  const box = document.getElementById('wThemes');
+  box.innerHTML = '';
+  Object.keys(THEMES).forEach(id=>{
+    const t = THEMES[id];
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `<button class="theme-swatch ${id===wizardTheme?'selected':''}" data-theme="${id}"
+      style="background:linear-gradient(135deg, ${t.accent} 50%, ${t.paper} 50%)" aria-label="Tema ${t.name}"></button>
+      <div class="theme-name">${t.name}</div>`;
+    wrap.querySelector('button').addEventListener('click', ()=>{
+      wizardTheme = id;
+      applyTheme(id);
+      box.querySelectorAll('.theme-swatch').forEach(b=>b.classList.toggle('selected', b.dataset.theme===id));
+    });
+    box.appendChild(wrap);
+  });
+}
+
+/* ================= WIZARD ================= */
+function renderWizard(prefill){
+  document.getElementById('appView').classList.add('hidden');
+  document.getElementById('fabSnowflake').classList.add('hidden');
+  document.getElementById('setupView').classList.remove('hidden');
+  const cfg = prefill || {};
+  document.getElementById('wIncome').value = cfg.income || '';
+  document.getElementById('wFreq').value = cfg.freq || 'quincenal';
+  document.getElementById('wNextPay').value = cfg.nextPayDate || '';
+  document.getElementById('wAutoSave').value = cfg.autoSave !== undefined ? cfg.autoSave : 0;
+  const strat = cfg.strategy || 'avalancha';
+  document.querySelectorAll('input[name=wStrategy]').forEach(r=>{ r.checked = r.value===strat; });
+  syncStrategyUI();
+  renderThemeSwatches(cfg.theme || 'bosque');
+  applyTheme(cfg.theme || 'bosque');
+
+  const expBox = document.getElementById('wExpenses');
+  expBox.innerHTML = '';
+  const expenses = (cfg.expenses && cfg.expenses.length) ? cfg.expenses : [
+    {name:'Renta / vivienda', amount:'', freq:'mensual'},
+    {name:'Comida', amount:'', freq:'porCheque'}
+  ];
+  expenses.forEach(e=>addExpenseRow(e));
+
+  const debtBox = document.getElementById('wDebts');
+  debtBox.innerHTML = '';
+  const debts = (cfg.debts && cfg.debts.length) ? cfg.debts : [{}];
+  debts.forEach(d=>addDebtRow(d));
+
+  // banner migración
+  const banner = document.getElementById('migrateBanner');
+  const old = (!prefill && getOldState());
+  if(old){
+    banner.innerHTML = `<div class="migrate-banner">👋 Detecté datos de la versión anterior. ¿Quieres importar tus deudas y pagos extra? <div class="btn-row"><button class="btn btn-green" id="btnMigrate">Importar</button></div></div>`;
+    document.getElementById('btnMigrate').addEventListener('click', ()=>migrateOld(old));
+  } else banner.innerHTML = '';
+}
+
+function syncStrategyUI(){
+  document.getElementById('optAva').classList.toggle('selected', document.querySelector('input[name=wStrategy][value=avalancha]').checked);
+  document.getElementById('optBola').classList.toggle('selected', document.querySelector('input[name=wStrategy][value=bolaDeNieve]').checked);
+}
+document.querySelectorAll('input[name=wStrategy]').forEach(r=>r.addEventListener('change', syncStrategyUI));
+
+function addExpenseRow(e){
+  e = e || {};
+  const div = document.createElement('div');
+  div.className = 'row-item';
+  div.innerHTML = `
+    <button class="row-del" aria-label="Eliminar gasto">✕</button>
+    <div class="field-row">
+      <div class="field" style="flex:2"><label>Nombre</label><input class="xName" value="${e.name||''}" placeholder="Renta"></div>
+      <div class="field"><label>Monto ($)</label><input class="xAmt" type="number" inputmode="decimal" value="${e.amount||''}" placeholder="150"></div>
+    </div>
+    <div class="field"><label>Frecuencia</label>
+      <select class="xFreq">
+        <option value="mensual" ${e.freq!=='porCheque'?'selected':''}>Mensual (una vez al mes)</option>
+        <option value="porCheque" ${e.freq==='porCheque'?'selected':''}>Por cheque (cada cobro)</option>
+      </select></div>`;
+  div.querySelector('.row-del').addEventListener('click', ()=>div.remove());
+  document.getElementById('wExpenses').appendChild(div);
+}
+document.getElementById('wAddExpense').addEventListener('click', ()=>addExpenseRow());
+
+function addDebtRow(d){
+  d = d || {};
+  const div = document.createElement('div');
+  div.className = 'row-item';
+  const hasAdv = d.promoEnd!==undefined && d.promoEnd!==null || d.recurring;
+  div.innerHTML = `
+    <button class="row-del" aria-label="Eliminar deuda">✕</button>
+    <div class="field"><label>Nombre</label><input class="dName" value="${d.name||''}" placeholder="Tarjeta Visa"></div>
+    <div class="field-row">
+      <div class="field"><label>Balance ($)</label><input class="dBal" type="number" inputmode="decimal" value="${d.bal||''}" placeholder="1500"></div>
+      <div class="field"><label>Interés anual (%)</label><input class="dApr" type="number" inputmode="decimal" value="${d.apr!==undefined?d.apr:''}" placeholder="24.99"></div>
+      <div class="field"><label>Mínimo/mes ($)</label><input class="dMin" type="number" inputmode="decimal" value="${d.min||''}" placeholder="40"></div>
+    </div>
+    <button class="adv-toggle">opciones avanzadas ▾</button>
+    <div class="adv-fields ${hasAdv?'open':''}">
+      <div class="field-row">
+        <div class="field"><label>Promo 0% hasta (mes)</label><input class="dPromo" type="month" value="${ymToMonthInput(d.promoEnd!==undefined&&d.promoEnd!==null?d.promoEnd-1:null)}"></div>
+        <div class="field"><label>APR después de promo (%)</label><input class="dAprAfter" type="number" inputmode="decimal" value="${d.aprAfterPromo||''}" placeholder="24.99"></div>
+      </div>
+      <div class="field"><label>Cargo recurrente mensual ($) — ej. suscripciones que cobran a esta tarjeta</label>
+        <input class="dRec" type="number" inputmode="decimal" value="${d.recurring||''}" placeholder="0"></div>
+    </div>`;
+  div.querySelector('.row-del').addEventListener('click', ()=>div.remove());
+  div.querySelector('.adv-toggle').addEventListener('click', ()=>{
+    div.querySelector('.adv-fields').classList.toggle('open');
+  });
+  document.getElementById('wDebts').appendChild(div);
+}
+document.getElementById('wAddDebt').addEventListener('click', ()=>addDebtRow());
+
+document.getElementById('wSave').addEventListener('click', ()=>{
+  const err = document.getElementById('wError');
+  err.classList.add('hidden');
+  const income = parseFloat(document.getElementById('wIncome').value);
+  const freq = document.getElementById('wFreq').value;
+  const nextPayDate = document.getElementById('wNextPay').value;
+  const autoSave = parseFloat(document.getElementById('wAutoSave').value)||0;
+
+  const expenses = [];
+  document.querySelectorAll('#wExpenses .row-item').forEach(r=>{
+    const name = r.querySelector('.xName').value.trim();
+    const amount = parseFloat(r.querySelector('.xAmt').value);
+    const efreq = r.querySelector('.xFreq').value;
+    if(name && amount > 0) expenses.push({name, amount, freq:efreq});
+  });
+  const debts = [];
+  document.querySelectorAll('#wDebts .row-item').forEach((r,i)=>{
+    const name = r.querySelector('.dName').value.trim();
+    const bal = parseFloat(r.querySelector('.dBal').value);
+    const apr = parseFloat(r.querySelector('.dApr').value)||0;
+    const min = parseFloat(r.querySelector('.dMin').value)||0;
+    const promoIn = r.querySelector('.dPromo').value;
+    const promoEnd = promoIn ? parseMonthInput(promoIn)+1 : null; // intereses desde el mes SIGUIENTE al indicado
+    const aprAfterPromo = parseFloat(r.querySelector('.dAprAfter').value)||null;
+    const recurring = parseFloat(r.querySelector('.dRec').value)||0;
+    if(name && bal > 0){
+      debts.push({id:'d'+i+'-'+name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,12),
+        name, bal, apr, min, promoEnd, aprAfterPromo, recurring, color:PALETTE[i%PALETTE.length]});
+    }
+  });
+  const strategy = document.querySelector('input[name=wStrategy]:checked').value;
+
+  if(!income || income<=0){ return showErr('Falta cuánto cobras por cheque.'); }
+  if(!nextPayDate){ return showErr('Falta tu próximo día de cobro.'); }
+  if(!debts.length){ return showErr('Añade al menos una deuda con balance.'); }
+  const perCheckExp = expenses.filter(e=>e.freq==='porCheque').reduce((s,e)=>s+e.amount,0);
+  if(income - autoSave - perCheckExp <= 0){ return showErr('Tus gastos por cheque + ahorro superan tu ingreso por cheque.'); }
+
+  const oldIds = state.config ? state.config.debts.map(d=>d.id).join() : '';
+  state.config = {income, freq, nextPayDate, autoSave, expenses, debts, strategy, theme:wizardTheme};
+  if(oldIds && oldIds !== debts.map(d=>d.id).join()){
+    // deudas cambiaron: limpiar kills huérfanos
+    Object.keys(state.kills).forEach(k=>{ if(!debts.find(d=>d.id===k)) delete state.kills[k]; });
+  }
+  saveState();
+  renderApp();
+  function showErr(msg){ err.textContent = '⚠️ ' + msg; err.classList.remove('hidden'); }
+});
+
+document.getElementById('btnSettings').addEventListener('click', ()=>renderWizard(state.config));
+
+function migrateOld(old){
+  const debts = [];
+  const baseMap = [
+    {id:'discover', name:'Discover', bal:2700, apr:28.99, min:35, recurring:90, promoEnd:null, aprAfterPromo:null},
+    {id:'hd', name:'Home Depot', bal:330, apr:29.99, min:27, recurring:0, promoEnd:null, aprAfterPromo:null},
+    {id:'bb', name:'Best Buy', bal:600, apr:29.99, min:30, recurring:0, promoEnd:null, aprAfterPromo:null},
+    {id:'chase', name:'Chase (0%)', bal:1500, apr:0, min:40, recurring:0, promoEnd:2027*12+1, aprAfterPromo:24.99}
+  ];
+  baseMap.forEach((d,i)=>{
+    const o = (old.overrides||{})[d.id]||{};
+    debts.push(Object.assign({}, d, o, {color:PALETTE[i%PALETTE.length]}));
+  });
+  (old.extraDebts||[]).forEach((d,i)=>{
+    debts.push({id:d.id, name:d.name, bal:d.bal, apr:d.apr, min:d.min, recurring:d.recurring||0,
+      promoEnd:null, aprAfterPromo:null, color:PALETTE[(4+i)%PALETTE.length]});
+  });
+  state.kills = old.kills || {};
+  state.snowflakes = old.snowflakes || [];
+  state.prePaid = 300;
+  renderWizard({
+    income:900, freq:'quincenal', nextPayDate:nextBiweeklyFrom('2026-07-24'), autoSave:100,
+    expenses:[
+      {name:'Renta', amount:150, freq:'mensual'},
+      {name:'Celular', amount:90, freq:'mensual'},
+      {name:'Cuentas (débito)', amount:20, freq:'mensual'},
+      {name:'Personal / imprevistos', amount:198, freq:'mensual'},
+      {name:'Comida', amount:138, freq:'porCheque'},
+      {name:'Gasolina', amount:22, freq:'porCheque'}
+    ],
+    debts, strategy:'avalancha'
+  });
+  document.getElementById('migrateBanner').innerHTML = '';
+}
+function nextBiweeklyFrom(anchorIso){
+  let d = new Date(anchorIso + 'T12:00:00');
+  while(d < TODAY){ d = new Date(d.getTime() + 14*86400000); }
+  return isoOf(d);
+}
+
+/* ================= MODALES ================= */
+const modalBg = document.getElementById('modalBg');
+const modalContent = document.getElementById('modalContent');
+function openModal(html){ modalContent.innerHTML = html; modalBg.classList.add('open'); }
+function closeModal(){ modalBg.classList.remove('open'); }
+modalBg.addEventListener('click', e=>{ if(e.target===modalBg) closeModal(); });
+
+document.getElementById('fabSnowflake').addEventListener('click', ()=>{
+  const opts = state.config.debts.filter(d=>!state.kills[d.id])
+    .map(d=>`<option value="${d.id}">${d.name}</option>`).join('');
+  openModal(`
+    <h3>❄️ Pago extra (snowflake)</h3>
+    <div class="field"><label>¿A qué deuda?</label><select id="sfDebt">${opts}</select></div>
+    <div class="field"><label>Monto</label><input type="number" id="sfAmt" inputmode="decimal" placeholder="50" min="1"></div>
+    <div class="field"><label>Fecha</label><input type="date" id="sfDate" value="${isoOf(new Date())}"></div>
+    <div class="btn-row">
+      <button class="btn btn-green" id="sfSave">Registrar pago</button>
+      <button class="btn btn-outline" id="sfCancel">Cancelar</button>
+    </div>
+    <div class="modal-msg" id="sfMsg"></div>
+  `);
+  document.getElementById('sfCancel').addEventListener('click', closeModal);
+  document.getElementById('sfSave').addEventListener('click', ()=>{
+    const amt = parseFloat(document.getElementById('sfAmt').value);
+    const debtId = document.getElementById('sfDebt').value;
+    const date = document.getElementById('sfDate').value;
+    if(!amt || amt<=0 || !date) return;
+    const before = CACHE.real;
+    state.snowflakes.push({date, debtId, amount:amt});
+    updateDynamic(); saveState();
+    const after = CACHE.real;
+    const msg = document.getElementById('sfMsg');
+    if(before.freeMonth !== null && after.freeMonth !== null){
+      const days = Math.max(0, Math.round((before.freeMonth - after.freeMonth)*30.4));
+      const intSaved = Math.max(0, before.totalInterest - after.totalInterest);
+      msg.innerHTML = `❄️ Registrado. Adelantaste tu libertad <strong>~${days} días</strong> y ahorraste <strong>${money(intSaved)}</strong> en intereses futuros.`;
+    } else msg.textContent = '❄️ Pago registrado.';
+    msg.classList.add('show');
+    document.getElementById('sfSave').disabled = true;
+    setTimeout(closeModal, 3200);
+  });
+});
+
+/* What-if */
+document.getElementById('whatifSlider').addEventListener('input', e=>{
+  state.whatif = parseInt(e.target.value,10)||0;
+  updateWhatif();
+});
+document.getElementById('whatifSlider').addEventListener('change', saveState);
+
+/* ================= ICS ================= */
+document.getElementById('btnIcs').addEventListener('click', ()=>{
+  let ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//DeudaCero//ES\r\nCALSCALE:GREGORIAN\r\n';
+  CACHE.items.byCheck.forEach(bc=>{
+    const c = bc.check;
+    if(c.date < TODAY) return;
+    const dt = c.iso.replace(/-/g,'');
+    const next = new Date(c.date); next.setDate(next.getDate()+1);
+    const dtEnd = isoOf(next).replace(/-/g,'');
+    const desc = bc.items.map(i=>`${i.n}: $${i.a}`).join('\\n');
+    ics += 'BEGIN:VEVENT\r\n';
+    ics += `UID:deudacero-${c.iso}@local\r\n`;
+    ics += `DTSTAMP:${dt}T120000Z\r\n`;
+    ics += `DTSTART;VALUE=DATE:${dt}\r\n`;
+    ics += `DTEND;VALUE=DATE:${dtEnd}\r\n`;
+    ics += `SUMMARY:💵 Día de cobro — plan de pagos\r\n`;
+    ics += `DESCRIPTION:${desc}\r\n`;
+    ics += 'BEGIN:VALARM\r\nTRIGGER:PT9H\r\nACTION:DISPLAY\r\nDESCRIPTION:Día de cobro\r\nEND:VALARM\r\n';
+    ics += 'END:VEVENT\r\n';
+  });
+  ics += 'END:VCALENDAR\r\n';
+  downloadBlob(ics, 'plan-pagos.ics', 'text/calendar');
+});
+
+/* ================= BACKUP ================= */
+document.getElementById('btnExport').addEventListener('click', ()=>{
+  downloadBlob(JSON.stringify(state, null, 2), 'deuda-cero-backup.json', 'application/json');
+});
+document.getElementById('btnImport').addEventListener('click', ()=>document.getElementById('importFile').click());
+document.getElementById('importFile').addEventListener('change', e=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const s = JSON.parse(reader.result);
+      if(!s.config) throw new Error('sin config');
+      state = Object.assign({config:null,done:{},kills:{},snowflakes:[],whatif:0,prePaid:0}, s);
+      saveState(); renderApp();
+    }catch(err){ alert('El archivo no es un backup válido.'); }
+  };
+  reader.readAsText(file);
+});
+function downloadBlob(content, filename, type){
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+
+/* ================= CONFETTI ================= */
+function fireConfetti(){
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const canvas = document.getElementById('confetti-canvas');
+  const dpr = window.devicePixelRatio||1;
+  canvas.width = innerWidth*dpr; canvas.height = innerHeight*dpr;
+  const ctx = canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
+  const colors = ['#1F6B4A','#C99A2E','#B3543F','#4A6B8A','#E4EFE8'];
+  const parts = [];
+  for(let i=0;i<90;i++){
+    parts.push({x: innerWidth/2 + (Math.random()-0.5)*120, y: innerHeight*0.35,
+      vx:(Math.random()-0.5)*9, vy:-Math.random()*10-3, s:Math.random()*7+4,
+      c:colors[Math.floor(Math.random()*colors.length)], r:Math.random()*Math.PI});
+  }
+  const t0 = performance.now();
+  function frame(t){
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    parts.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=0.28; p.r+=0.1;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.r);
+      ctx.fillStyle=p.c; ctx.fillRect(-p.s/2,-p.s/2,p.s,p.s);
+      ctx.restore();
+    });
+    if(t - t0 < 2200) requestAnimationFrame(frame);
+    else ctx.clearRect(0,0,innerWidth,innerHeight);
+  }
+  requestAnimationFrame(frame);
+}
+
+/* ================= INIT ================= */
+loadState().then(()=>{
+  if(state.config) renderApp();
+  else renderWizard(null);
+});
+window.addEventListener('resize', ()=>{ if(state.config) drawChart(); });
+</script>
+</body>
+</html>
